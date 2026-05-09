@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEO Operations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-mark">L</div>
+            <div>
+                <div class="brand-name">LEO Ops</div>
+                <div class="brand-sub">Center management</div>
+            </div>
+        </div>
+        <nav class="nav-links">
+            <button onclick="showView('view-attendance')" id="nav-attendance" class="active">
+                <span class="nav-dot"></span> Attendance
+            </button>
+            <button onclick="showView('view-schedule')" id="nav-schedule">
+                <span class="nav-dot"></span> Schedule
+            </button>
+            <button onclick="showView('view-onboarding')" id="nav-onboarding">
+                <span class="nav-dot"></span> Onboarding
+            </button>
+            <button onclick="showView('view-reports')" id="nav-reports">
+                <span class="nav-dot"></span> Session Reports
+            </button>
+            <button onclick="showView('view-whatsapp')" id="nav-whatsapp">
+                <span class="nav-dot"></span> Reminders
+            </button>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="env-pill">● Connected</div>
+        </div>
+    </aside>
+
+    <main class="content">
+
+        <!-- ATTENDANCE -->
+        <section id="view-attendance" class="view active">
+            <header class="view-header">
+                <div>
+                    <h1>Attendance</h1>
+                    <p class="lede">Mark daily presence and review the monthly history.</p>
+                </div>
+            </header>
+
+            <div class="card">
+                <div class="filter-row">
+                    <div class="field">
+                        <label>Center</label>
+                        <select id="center-select" onchange="handleCenterChange(this)"></select>
+                    </div>
+                    <div class="field">
+                        <label>Date</label>
+                        <input type="date" id="class-date">
+                    </div>
+                    <div class="field-meta">
+                        <span class="meta-label">Selected center</span>
+                        <span class="meta-value" id="center-name">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Today's roster</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Name</th><th>Email</th><th>Status</th><th>Mark attendance</th></tr>
+                    </thead>
+                    <tbody id="student-list">
+                        <tr><td colspan="4" class="empty">Select a center to load students.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Monthly history</h2>
+                    <input type="month" id="overview-month" class="inline-input">
+                </div>
+                <div class="overview-wrap">
+                    <table class="overview-table">
+                        <thead id="overview-head"></thead>
+                        <tbody id="overview-body"></tbody>
+                    </table>
+                </div>
+                <div class="legend">
+                    <span><span class="legend-dot present"></span> Present</span>
+                    <span><span class="legend-dot absent"></span> Absent</span>
+                    <span><span class="legend-dot excused"></span> Excused</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCHEDULE -->
+        <section id="view-schedule" class="view">
+            <header class="view-header">
+                <div>
+                    <h1>Schedule a session</h1>
+                    <p class="lede">Plan a lecture and push it straight into the Moodle course calendar.</p>
+                </div>
+            </header>
+
+            <div class="card form-card">
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Lecture topic</label>
+                        <input type="text" id="sched-topic" placeholder="e.g. Intro to Linear Algebra">
+                    </div>
+                    <div class="field">
+                        <label>Course</label>
+                        <select id="sched-course">
+                            <option value="">— Select a course —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Date & time</label>
+                        <input type="datetime-local" id="sched-time">
+                    </div>
+                    <div class="field">
+                        <label>Duration (minutes)</label>
+                        <input type="number" id="sched-duration" value="60" min="15" step="15">
+                    </div>
+                    <div class="field full">
+                        <label>Meeting link (Zoom / Meet / Jitsi)</label>
+                        <input type="url" id="sched-link" placeholder="https://...">
+                    </div>
+                    <div class="field full">
+                        <label>Target centers</label>
+                        <div id="center-checkboxes" class="check-grid"></div>
+                    </div>
+                </div>
+                <button id="sched-save-btn" class="btn-primary" onclick="saveSchedule()">
+                    Save Session
+                </button>
+            </div>
+        </section>
+
+        <!-- ONBOARDING -->
+        <section id="view-onboarding" class="view">
+            <header class="view-header">
+                <div>
+                    <h1>Student onboarding</h1>
+                    <p class="lede">Create the Moodle account, enroll into a course, and store the student locally — in one step.</p>
+                </div>
+            </header>
+
+            <div class="card form-card">
+                <h2 class="card-title">New participant</h2>
+                <form id="onboard-form" class="form-grid">
+                    <div class="field">
+                        <label>Full name</label>
+                        <input type="text" name="full_name" required placeholder="Jane Doe">
+                    </div>
+                    <div class="field">
+                        <label>Email</label>
+                        <input type="email" name="email" required placeholder="jane@example.com">
+                    </div>
+                    <div class="field">
+                        <label>Center</label>
+                        <select name="center_id" id="onboard-center" required></select>
+                    </div>
+                    <div class="field">
+                        <label>Enroll in course</label>
+                        <select name="moodle_course_id" id="onboard-course"></select>
+                    </div>
+                    <div class="full">
+                        <button type="submit" class="btn-primary">Create Account & Enroll</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Recent onboardings</h2>
+                <table class="data-table">
+                    <thead><tr><th>Name</th><th>Email</th><th>Center</th><th>Moodle</th><th>Added</th></tr></thead>
+                    <tbody id="onboard-list"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- REPORTS -->
+        <section id="view-reports" class="view">
+            <header class="view-header">
+                <div>
+                    <h1>Session reports</h1>
+                    <p class="lede">After each session, log how it went, the state of the center, and any issues.</p>
+                </div>
+            </header>
+            <div class="card">
+                <div class="placeholder">Session reporting module — see SETUP.md for the schema and Make.com flow.</div>
+            </div>
+        </section>
+
+        <!-- WHATSAPP -->
+        <section id="view-whatsapp" class="view">
+            <header class="view-header">
+                <div>
+                    <h1>WhatsApp reminders</h1>
+                    <p class="lede">Automated session reminders for participant groups.</p>
+                </div>
+            </header>
+            <div class="card">
+                <div class="placeholder">Configured via Make.com + Meta WhatsApp Cloud API — see SETUP.md.</div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/attendance.js"></script>
+    <script src="js/scheduler.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

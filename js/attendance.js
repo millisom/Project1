@@ -104,15 +104,16 @@ async function fetchCourses() {
     if (error) { console.error(error); return; }
 
     const courseSelect = document.getElementById('sched-course');
+    courseSelect.innerHTML = '<option value="">— Select a course —</option>';
+    
     courses.forEach(course => {
         const option = document.createElement('option');
-        option.value = course.moodle_course_id || course.id;
+        option.value = course.id;  // ← FIXED: Use UUID for Supabase
         option.textContent = course.course_name;
-        option.dataset.dbId = course.id;
+        option.dataset.moodleId = course.moodle_course_id;
         courseSelect.appendChild(option);
     });
 }
-
 
 async function onboardStudent(e) {
     e.preventDefault();
@@ -131,21 +132,20 @@ async function onboardStudent(e) {
     submitBtn.textContent = "Saving...";
 
     try {
-
         const { error } = await supabaseClient.from('students').insert([{
             full_name: fullName,
             email,
             center_id: centerId,
-            moodle_id: null, // Will be filled by Make.com
-            status: 'Pending', // Changed from 'Active'
-            onboarding_course_id: moodleCourseId || null, // Store desired course
+            moodle_id: null,
+            status: 'Active',
+            onboarding_course_id: moodleCourseId || null,
         }]);
         if (error) throw error;
 
         toast(
-            `Student queued for onboarding. Make.com will create the Moodle account within 15 minutes.`,
+            `Student saved! Moodle account creation in progress (takes ~30 seconds).`,
             "success",
-            8000
+            6000
         );
         form.reset();
         loadOnboardingList();
@@ -154,7 +154,7 @@ async function onboardStudent(e) {
         toast(`Failed to save student: ${err.message}`, "error");
     } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = "Create Account & Enroll";
+        submitBtn.textContent = "Add Student";
     }
 }
 
@@ -192,16 +192,21 @@ async function loadOnboardingList() {
 }
 
 async function populateOnboardingDropdowns() {
-    const { data: centers } = await supabaseClient.from('centers').select('id, name').order('name');
-    const { data: courses } = await supabaseClient.from('courses').select('moodle_course_id, course_name').order('course_name');
     const cSel = document.getElementById('onboard-center');
     const crsSel = document.getElementById('onboard-course');
-    if (cSel) {
-        cSel.innerHTML = '<option value="">— Select center —</option>' +
-            (centers || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    
+
+    if (!cSel || !crsSel) {
+        console.log('Onboarding dropdowns not found, skipping populate');
+        return;
     }
-    if (crsSel) {
-        crsSel.innerHTML = '<option value="">— No course (manual later) —</option>' +
-            (courses || []).filter(c => c.moodle_course_id).map(c => `<option value="${c.moodle_course_id}">${c.course_name}</option>`).join('');
-    }
+    
+    const { data: centers } = await supabaseClient.from('centers').select('id, name').order('name');
+    const { data: courses } = await supabaseClient.from('courses').select('moodle_course_id, course_name').order('course_name');
+    
+    cSel.innerHTML = '<option value="">— Select center —</option>' +
+        (centers || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    
+    crsSel.innerHTML = '<option value="">— No course (manual later) —</option>' +
+        (courses || []).filter(c => c.moodle_course_id).map(c => `<option value="${c.moodle_course_id}">${c.course_name}</option>`).join('');
 }
