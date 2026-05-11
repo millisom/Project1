@@ -121,7 +121,9 @@ function showView(viewId) {
         loadOnboardingList();
     }
     if (viewId === 'view-reports') {
-        loadPendingReports?.();
+        if (typeof loadPendingReports !== 'undefined') {
+            loadPendingReports();
+        }
     }
 }
 

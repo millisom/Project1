@@ -193,20 +193,25 @@ async function loadOnboardingList() {
 
 async function populateOnboardingDropdowns() {
     const cSel = document.getElementById('onboard-center');
-    const crsSel = document.getElementById('onboard-course');
+    const courseCheckboxes = document.getElementById('onboard-courses'); // Fixed: was 'onboard-course'
     
-
-    if (!cSel || !crsSel) {
+    if (!cSel || !courseCheckboxes) {
         console.log('Onboarding dropdowns not found, skipping populate');
         return;
     }
     
     const { data: centers } = await supabaseClient.from('centers').select('id, name').order('name');
-    const { data: courses } = await supabaseClient.from('courses').select('moodle_course_id, course_name').order('course_name');
+    const { data: courses } = await supabaseClient.from('courses').select('id, course_name, moodle_course_id').order('course_name');
     
     cSel.innerHTML = '<option value="">— Select center —</option>' +
         (centers || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
-    crsSel.innerHTML = '<option value="">— No course (manual later) —</option>' +
-        (courses || []).filter(c => c.moodle_course_id).map(c => `<option value="${c.moodle_course_id}">${c.course_name}</option>`).join('');
+    // Generate checkboxes instead of dropdown options
+    courseCheckboxes.innerHTML = (courses || []).filter(c => c.moodle_course_id).map(course => `
+        <div class="check-pill">
+            <input type="checkbox" class="course-check" value="${course.id}" 
+                   data-moodle-id="${course.moodle_course_id}" id="course-${course.id}">
+            <label for="course-${course.id}">${course.course_name}</label>
+        </div>
+    `).join('');
 }
