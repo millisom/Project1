@@ -121,7 +121,12 @@ async function onboardStudent(e) {
     const fullName = form.full_name.value.trim();
     const email = form.email.value.trim();
     const centerId = form.center_id.value;
-    const moodleCourseId = form.moodle_course_id.value;
+    
+    // NEW: Get selected courses from checkboxes
+    const selectedCourses = Array.from(document.querySelectorAll('.course-check:checked')).map(cb => ({
+        course_id: cb.value,
+        moodle_course_id: parseInt(cb.dataset.moodleId, 10)
+    }));
 
     if (!fullName || !email || !centerId) {
         return toast("Name, email, and center are required.", "error");
@@ -132,22 +137,35 @@ async function onboardStudent(e) {
     submitBtn.textContent = "Saving...";
 
     try {
-        const { error } = await supabaseClient.from('students').insert([{
+        // 1. Insert student
+        const { data: newStudent, error } = await supabaseClient.from('students').insert([{
             full_name: fullName,
             email,
             center_id: centerId,
             moodle_id: null,
             status: 'Active',
-            onboarding_course_id: moodleCourseId || null,
-        }]);
+        }]).select().single();
+        
         if (error) throw error;
 
-        toast(
-            `Student saved! Moodle account creation in progress (takes ~30 seconds).`,
-            "success",
-            6000
-        );
+        // 2. Insert enrollment records (if courses selected)
+        if (selectedCourses.length > 0) {
+            const enrollmentRows = selectedCourses.map(c => ({
+                student_id: newStudent.id,
+                course_id: c.course_id,
+                moodle_course_id: c.moodle_course_id,
+            }));
+            
+            const { error: enrollError } = await supabaseClient
+                .from('student_enrollments')
+                .insert(enrollmentRows);
+            
+            if (enrollError) throw enrollError;
+        }
+
+        toast(`Student saved! Moodle account and enrollments in progress (~30 seconds).`, "success", 6000);
         form.reset();
+        document.querySelectorAll('.course-check:checked').forEach(cb => cb.checked = false);
         loadOnboardingList();
     } catch (err) {
         console.error(err);

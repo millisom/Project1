@@ -1,3 +1,6 @@
+// js/ui.js
+
+// ---------------- Toast notifications (replaces alert()) ----------------
 function toast(message, type = "info", duration = 4000) {
     const container = document.getElementById('toast-container') || (() => {
         const c = document.createElement('div');
@@ -16,7 +19,7 @@ function toast(message, type = "info", duration = 4000) {
     }, duration);
 }
 
-
+// ---------------- Attendance button state ----------------
 function resetAllButtons() {
     document.querySelectorAll('.attendance-btn').forEach(btn => {
         btn.classList.remove('selected', 'present', 'absent', 'excused');
@@ -44,7 +47,7 @@ function updateButtonVisuals(studentId, selectedStatus) {
     });
 }
 
-
+// ---------------- Monthly matrix ----------------
 async function renderOverviewTable() {
     if (typeof currentStudents === 'undefined' || currentStudents.length === 0) return;
     const monthVal = document.getElementById('overview-month').value;
@@ -108,22 +111,20 @@ function liveUpdateOverviewCell(studentId, selectedDate, status) {
     }
 }
 
-
+// ---------------- View switching ----------------
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-links button').forEach(b => b.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
     document.getElementById(viewId.replace('view-', 'nav-')).classList.add('active');
 
-
+    // Lazy-load data for the view
     if (viewId === 'view-onboarding') {
         populateOnboardingDropdowns();
         loadOnboardingList();
     }
     if (viewId === 'view-reports') {
-        if (typeof loadPendingReports !== 'undefined') {
-            loadPendingReports();
-        }
+        initReports();
     }
 }
 

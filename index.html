@@ -195,8 +195,65 @@
                     <p class="lede">After each session, log how it went, the state of the center, and any issues.</p>
                 </div>
             </header>
+            
+            <div class="card form-card">
+                <h2 class="card-title">Submit Report</h2>
+                <form id="report-form" class="form-grid">
+                    <div class="field">
+                        <label>Session</label>
+                        <select id="report-session" required>
+                            <option value="">— Select session —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Your Center</label>
+                        <select id="report-center" required>
+                            <option value="">— Select center —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Attendees Count</label>
+                        <input type="number" id="report-count" min="0" placeholder="e.g. 15">
+                    </div>
+                    <div class="field">
+                        <label>Session Outcome</label>
+                        <select id="report-outcome">
+                            <option value="Excellent">Excellent</option>
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Poor">Poor</option>
+                        </select>
+                    </div>
+                    <div class="field full">
+                        <label>Center Condition</label>
+                        <textarea id="report-condition" rows="3" placeholder="Describe the physical state of the center, equipment, cleanliness, etc."></textarea>
+                    </div>
+                    <div class="field full">
+                        <label>Issues or Challenges</label>
+                        <textarea id="report-issues" rows="3" placeholder="Any problems encountered during the session?"></textarea>
+                    </div>
+                    <div class="full">
+                        <button type="submit" class="btn-primary">Submit Report</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="card">
-                <div class="placeholder">Session reporting module — see SETUP.md for the schema and Make.com flow.</div>
+                <h2 class="card-title">Recent Reports</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Center</th>
+                            <th>Outcome</th>
+                            <th>Attendees</th>
+                            <th>Submitted</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reports-list">
+                        <tr><td colspan="5" class="empty">Loading…</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
@@ -220,6 +277,7 @@
     <script src="js/ui.js"></script>
     <script src="js/attendance.js"></script>
     <script src="js/scheduler.js"></script>
+    <script src="js/reports.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
