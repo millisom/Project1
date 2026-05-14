@@ -29,6 +29,9 @@
             <button onclick="showView('view-onboarding')" id="nav-onboarding">
                 <span class="nav-dot"></span> Onboarding
             </button>
+            <button onclick="showView('view-progress')" id="nav-progress">
+                <span class="nav-dot"></span> Progress
+            </button>
             <button onclick="showView('view-reports')" id="nav-reports">
                 <span class="nav-dot"></span> Session Reports
             </button>
@@ -43,7 +46,6 @@
 
     <main class="content">
 
-        <!-- ATTENDANCE -->
         <section id="view-attendance" class="view active">
             <header class="view-header">
                 <div>
@@ -59,48 +61,74 @@
                         <select id="center-select" onchange="handleCenterChange(this)"></select>
                     </div>
                     <div class="field">
-                        <label>Date</label>
-                        <input type="date" id="class-date">
+                        <label>Session</label>
+                        <select id="session-select" onchange="loadAttendanceForSession()">
+                            <option value="">— Select a session —</option>
+                        </select>
                     </div>
                     <div class="field-meta">
-                        <span class="meta-label">Selected center</span>
-                        <span class="meta-value" id="center-name">—</span>
+                        <span class="meta-label">Selected session</span>
+                        <span class="meta-value" id="session-info">—</span>
                     </div>
                 </div>
             </div>
 
             <div class="card">
-                <h2 class="card-title">Today's roster</h2>
+                <h2 class="card-title">Session Roster</h2>
+                <div id="session-details" class="session-details" style="display:none; margin-bottom: 16px; padding: 12px; background: var(--accent-soft); border-radius: var(--radius-sm);">
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                        <div>
+                            <div class="muted" style="font-size: 12px;">Topic</div>
+                            <div id="detail-topic" style="font-weight: 500;">—</div>
+                        </div>
+                        <div>
+                            <div class="muted" style="font-size: 12px;">Date & Time</div>
+                            <div id="detail-datetime">—</div>
+                        </div>
+                        <div>
+                            <div class="muted" style="font-size: 12px;">Duration</div>
+                            <div id="detail-duration">—</div>
+                        </div>
+                    </div>
+                </div>
                 <table class="data-table">
                     <thead>
                         <tr><th>Name</th><th>Email</th><th>Status</th><th>Mark attendance</th></tr>
                     </thead>
                     <tbody id="student-list">
-                        <tr><td colspan="4" class="empty">Select a center to load students.</td></tr>
+                        <tr><td colspan="4" class="empty">Select a center and session to load students.</td></tr>
                     </tbody>
                 </table>
             </div>
 
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Monthly history</h2>
-                    <input type="month" id="overview-month" class="inline-input">
+                    <h2 class="card-title">Session Overview</h2>
+                    <select id="overview-timeframe" onchange="renderSessionOverview()" style="width: 150px;">
+                        <option value="7">Last 7 days</option>
+                        <option value="14">Last 14 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="60">Last 60 days</option>
+                    </select>
                 </div>
-                <div class="overview-wrap">
-                    <table class="overview-table">
-                        <thead id="overview-head"></thead>
-                        <tbody id="overview-body"></tbody>
-                    </table>
-                </div>
-                <div class="legend">
-                    <span><span class="legend-dot present"></span> Present</span>
-                    <span><span class="legend-dot absent"></span> Absent</span>
-                    <span><span class="legend-dot excused"></span> Excused</span>
-                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Course</th>
+                            <th>Date & Time</th>
+                            <th>Duration</th>
+                            <th>Attendance</th>
+                            <th>Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody id="session-overview-body">
+                        <tr><td colspan="6" class="empty">Select a center to view sessions.</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
 
-        <!-- SCHEDULE -->
         <section id="view-schedule" class="view">
             <header class="view-header">
                 <div>
@@ -135,6 +163,9 @@
                     </div>
                     <div class="field full">
                         <label>Target centers</label>
+                        <input type="text" id="center-search" placeholder="Search centers..." 
+                               onkeyup="filterCenterCheckboxes()" 
+                               style="margin-bottom: 12px; width: 100%;">
                         <div id="center-checkboxes" class="check-grid"></div>
                     </div>
                 </div>
@@ -144,7 +175,7 @@
             </div>
         </section>
 
-        <!-- ONBOARDING -->
+
         <section id="view-onboarding" class="view">
             <header class="view-header">
                 <div>
@@ -169,7 +200,10 @@
                         <select name="center_id" id="onboard-center" required></select>
                     </div>
                     <div class="field full">
-                        <label>Enroll in courses (select multiple)</label>
+                        <label>
+                            Enroll in courses (select multiple)
+                            <button type="button" onclick="toggleAllCourses()" class="btn-link" style="margin-left: 12px;">Select All</button>
+                        </label>
                         <div id="onboard-courses" class="check-grid"></div>
                     </div>
                     <div class="full">
@@ -187,7 +221,77 @@
             </div>
         </section>
 
-        <!-- REPORTS -->
+
+        <section id="view-progress" class="view">
+            <header class="view-header">
+                <div>
+                    <h1>Student Progress</h1>
+                    <p class="lede">Track Moodle course completion and attendance rates in one place.</p>
+                </div>
+            </header>
+
+            <div class="card">
+                <div class="filter-row">
+                    <div class="field">
+                        <label>Center</label>
+                        <select id="progress-center">
+                            <option value="">— All Centers —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Course</label>
+                        <select id="progress-course">
+                            <option value="">— All Courses —</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <button onclick="syncMoodleProgress()" class="btn-secondary"> Sync from Moodle</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">Avg Attendance</div>
+                        <div class="stat-value" id="stat-avg-attendance">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Avg Completion</div>
+                        <div class="stat-value" id="stat-avg-completion">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">At Risk</div>
+                        <div class="stat-value" id="stat-at-risk">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Students</div>
+                        <div class="stat-value" id="stat-total-students">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title">Student Progress Overview</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Course</th>
+                            <th>Moodle Progress</th>
+                            <th>Attendance</th>
+                            <th>Last Active</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="progress-list">
+                        <tr><td colspan="6" class="empty">Select filters and click "Sync from Moodle"</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+
         <section id="view-reports" class="view">
             <header class="view-header">
                 <div>
@@ -257,27 +361,126 @@
             </div>
         </section>
 
-        <!-- WHATSAPP -->
         <section id="view-whatsapp" class="view">
             <header class="view-header">
                 <div>
-                    <h1>WhatsApp reminders</h1>
-                    <p class="lede">Automated session reminders for participant groups.</p>
+                    <h1>Email Reminders</h1>
+                    <p class="lede">Automated session reminders sent to students and teachers.</p>
                 </div>
             </header>
+
             <div class="card">
-                <div class="placeholder">Configured via Make.com + Meta WhatsApp Cloud API — see SETUP.md.</div>
+                <h2 class="card-title">Reminder Settings</h2>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>
+                            <input type="checkbox" id="remind-enabled" onchange="saveReminderSettings()" checked>
+                            Enable automated reminders
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>Send reminders</label>
+                        <select id="remind-hours" onchange="saveReminderSettings()">
+                            <option value="2">2 hours before</option>
+                            <option value="4">4 hours before</option>
+                            <option value="12">12 hours before</option>
+                            <option value="24" selected>24 hours before</option>
+                            <option value="48">48 hours before</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>
+                            <input type="checkbox" id="remind-students" onchange="saveReminderSettings()" checked>
+                            Send to students
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>
+                            <input type="checkbox" id="remind-teachers" onchange="saveReminderSettings()" checked>
+                            Send to teachers (optional)
+                        </label>
+                    </div>
+                </div>
+                <p class="muted" style="margin-top: 12px;">
+                    <strong>Note:</strong> The Make.com scenario runs daily at 8 AM to send reminders for upcoming sessions.
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Upcoming Sessions (Next 7 Days)</h2>
+                    <button onclick="loadUpcomingSessions()" class="btn-secondary"> Refresh</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Course</th>
+                            <th>Date & Time</th>
+                            <th>Centers</th>
+                            <th>Students</th>
+                            <th>Send Reminder</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reminders-list">
+                        <tr><td colspan="7" class="empty">Loading...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </section>
     </main>
 
     <div id="toast-container"></div>
 
+
+    <div id="attendance-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-session-title">Session Attendance</h2>
+                <button onclick="closeAttendanceModal()" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="modal-session-info" style="margin-bottom: 20px; padding: 12px; background: var(--accent-soft); border-radius: var(--radius-sm);"></div>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: var(--green);" id="modal-present-count">0</div>
+                        <div class="stat-label">Present</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: var(--red);" id="modal-absent-count">0</div>
+                        <div class="stat-label">Absent</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" style="color: var(--orange);" id="modal-excused-count">0</div>
+                        <div class="stat-label">Excused</div>
+                    </div>
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Email</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-student-list">
+                        <tr><td colspan="3" class="empty">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/attendance.js"></script>
     <script src="js/scheduler.js"></script>
     <script src="js/reports.js"></script>
+    <script src="js/progress.js"></script>
+    <script src="js/reminders.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

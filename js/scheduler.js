@@ -1,3 +1,17 @@
+function filterCenterCheckboxes() {
+    const searchText = document.getElementById('center-search').value.toLowerCase();
+    const checkboxes = document.querySelectorAll('#center-checkboxes .check-pill');
+    
+    checkboxes.forEach(pill => {
+        const label = pill.querySelector('label').textContent.toLowerCase();
+        if (label.includes(searchText)) {
+            pill.style.display = '';
+        } else {
+            pill.style.display = 'none';
+        }
+    });
+}
+
 async function saveSchedule() {
     const topic = document.getElementById('sched-topic').value.trim();
     const time = document.getElementById('sched-time').value;
@@ -30,7 +44,7 @@ async function saveSchedule() {
                 meeting_link: link,
                 course_id: courseId,
                 duration_min: duration,
-                moodle_event_id: null,
+                moodle_event_id: null, 
             }])
             .select()
             .single();
@@ -53,7 +67,7 @@ async function saveSchedule() {
             6000
         );
 
-
+  
         document.getElementById('sched-topic').value = '';
         document.getElementById('sched-time').value = '';
         document.getElementById('sched-link').value = '';

@@ -1,4 +1,5 @@
 let currentStudents = [];
+let currentSession = null;
 
 async function fetchCenters() {
     const { data: centers, error } = await supabaseClient
@@ -12,7 +13,7 @@ async function fetchCenters() {
     const checkboxContainer = document.getElementById('center-checkboxes');
 
     select.innerHTML = '<option value="">— Select a Center —</option>';
-    checkboxContainer.innerHTML = '';
+    if (checkboxContainer) checkboxContainer.innerHTML = '';
 
     centers.forEach(center => {
         const option = document.createElement('option');
@@ -20,13 +21,73 @@ async function fetchCenters() {
         option.textContent = center.name;
         select.appendChild(option);
 
-        const div = document.createElement('div');
-        div.className = 'check-pill';
-        div.innerHTML = `
-            <input type="checkbox" class="center-check" value="${center.id}" id="check-${center.id}">
-            <label for="check-${center.id}">${center.name}</label>`;
-        checkboxContainer.appendChild(div);
+        if (checkboxContainer) {
+            const div = document.createElement('div');
+            div.className = 'check-pill';
+            div.innerHTML = `
+                <input type="checkbox" class="center-check" value="${center.id}" id="check-${center.id}">
+                <label for="check-${center.id}">${center.name}</label>`;
+            checkboxContainer.appendChild(div);
+        }
     });
+}
+
+async function handleCenterChange(select) {
+    const centerId = select.value;
+    if (!centerId) {
+        document.getElementById('session-select').innerHTML = '<option value="">— Select a session —</option>';
+        return;
+    }
+
+    // Load sessions for this center
+    const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: centerSessions } = await supabaseClient
+        .from('schedule_centers')
+        .select('schedule_id')
+        .eq('center_id', centerId);
+
+    if (!centerSessions || centerSessions.length === 0) {
+        document.getElementById('session-select').innerHTML = '<option value="">— No sessions found —</option>';
+        return;
+    }
+
+    const scheduleIds = centerSessions.map(s => s.schedule_id);
+
+    const { data: sessions } = await supabaseClient
+        .from('schedule')
+        .select('id, lecture_topic, date_and_time, duration_min, courses(course_name)')
+        .in('id', scheduleIds)
+        .gte('date_and_time', startDate)
+        .lte('date_and_time', endDate)
+        .order('date_and_time', { ascending: true });
+
+    const sessionSelect = document.getElementById('session-select');
+    sessionSelect.innerHTML = '<option value="">— Select a session —</option>';
+
+    if (!sessions || sessions.length === 0) {
+        sessionSelect.innerHTML = '<option value="">— No sessions scheduled —</option>';
+        return;
+    }
+
+    sessions.forEach(session => {
+        const date = new Date(session.date_and_time);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const courseName = session.courses?.course_name || 'Unknown Course';
+        
+        const option = document.createElement('option');
+        option.value = session.id;
+        option.textContent = `${dateStr} ${timeStr} - ${session.lecture_topic} (${courseName})`;
+        option.dataset.sessionData = JSON.stringify(session);
+        sessionSelect.appendChild(option);
+    });
+
+    await fetchStudents(centerId);
+    
+    // Also render the session overview
+    await renderSessionOverview();
 }
 
 async function fetchStudents(centerId) {
@@ -42,8 +103,6 @@ async function fetchStudents(centerId) {
     const tableBody = document.getElementById('student-list');
     if (currentStudents.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="4" class="empty">No students enrolled in this center yet.</td></tr>`;
-        document.getElementById('overview-body').innerHTML = '';
-        document.getElementById('overview-head').innerHTML = '';
         return;
     }
 
@@ -58,41 +117,65 @@ async function fetchStudents(centerId) {
                 <button id="btn-Excused-${student.id}" onclick="markAttendance('${student.id}', 'Excused')" class="attendance-btn">Excused</button>
             </td>
         </tr>`).join('');
+}
 
-    loadAttendanceForDate();
-    renderOverviewTable();
+async function loadAttendanceForSession() {
+    const sessionSelect = document.getElementById('session-select');
+    const selectedOption = sessionSelect.options[sessionSelect.selectedIndex];
+    
+    if (!selectedOption || !selectedOption.dataset.sessionData) {
+        document.getElementById('session-details').style.display = 'none';
+        document.getElementById('session-info').textContent = '—';
+        return;
+    }
+
+    currentSession = JSON.parse(selectedOption.dataset.sessionData);
+    
+    // Display session details
+    const date = new Date(currentSession.date_and_time);
+    document.getElementById('detail-topic').textContent = currentSession.lecture_topic;
+    document.getElementById('detail-datetime').textContent = date.toLocaleString('en-US', { 
+        month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+    });
+    document.getElementById('detail-duration').textContent = `${currentSession.duration_min} minutes`;
+    document.getElementById('session-info').textContent = currentSession.lecture_topic;
+    document.getElementById('session-details').style.display = 'block';
+
+    // Reset all buttons
+    resetAllButtons();
+
+    // Load attendance for this session
+    const { data: records } = await supabaseClient
+        .from('attendance')
+        .select('student_id, status')
+        .eq('schedule_id', currentSession.id)
+        .in('student_id', currentStudents.map(s => s.id));
+
+    if (records) records.forEach(r => updateButtonVisuals(r.student_id, r.status));
 }
 
 async function markAttendance(studentId, status) {
-    const selectedDate = document.getElementById('class-date').value;
-    if (!selectedDate) return toast("Select a date first.", "error");
+    if (!currentSession) {
+        return toast("Please select a session first.", "error");
+    }
 
     const { data: existing } = await supabaseClient
         .from('attendance')
         .select('id')
         .eq('student_id', studentId)
-        .eq('class_date', selectedDate);
+        .eq('schedule_id', currentSession.id);
 
     if (existing && existing.length > 0) {
         await supabaseClient.from('attendance').update({ status }).eq('id', existing[0].id);
     } else {
-        await supabaseClient.from('attendance').insert([{ student_id: studentId, status, class_date: selectedDate }]);
+        await supabaseClient.from('attendance').insert([{ 
+            student_id: studentId, 
+            status, 
+            schedule_id: currentSession.id,
+            class_date: new Date(currentSession.date_and_time).toISOString().split('T')[0]
+        }]);
     }
     updateButtonVisuals(studentId, status);
-    liveUpdateOverviewCell(studentId, selectedDate, status);
-}
-
-async function loadAttendanceForDate() {
-    const selectedDate = document.getElementById('class-date').value;
-    const centerId = document.getElementById('center-select').value;
-    if (!selectedDate || !centerId) return;
-    resetAllButtons();
-    const { data: records } = await supabaseClient
-        .from('attendance')
-        .select('student_id, status')
-        .eq('class_date', selectedDate)
-        .in('student_id', currentStudents.map(s => s.id));
-    if (records) records.forEach(r => updateButtonVisuals(r.student_id, r.status));
 }
 
 async function fetchCourses() {
@@ -104,15 +187,17 @@ async function fetchCourses() {
     if (error) { console.error(error); return; }
 
     const courseSelect = document.getElementById('sched-course');
-    courseSelect.innerHTML = '<option value="">— Select a course —</option>';
-    
-    courses.forEach(course => {
-        const option = document.createElement('option');
-        option.value = course.id;  // ← FIXED: Use UUID for Supabase
-        option.textContent = course.course_name;
-        option.dataset.moodleId = course.moodle_course_id;
-        courseSelect.appendChild(option);
-    });
+    if (courseSelect) {
+        courseSelect.innerHTML = '<option value="">— Select a course —</option>';
+        
+        courses.forEach(course => {
+            const option = document.createElement('option');
+            option.value = course.id;
+            option.textContent = course.course_name;
+            option.dataset.moodleId = course.moodle_course_id;
+            courseSelect.appendChild(option);
+        });
+    }
 }
 
 async function onboardStudent(e) {
@@ -122,7 +207,6 @@ async function onboardStudent(e) {
     const email = form.email.value.trim();
     const centerId = form.center_id.value;
     
-    // NEW: Get selected courses from checkboxes
     const selectedCourses = Array.from(document.querySelectorAll('.course-check:checked')).map(cb => ({
         course_id: cb.value,
         moodle_course_id: parseInt(cb.dataset.moodleId, 10)
@@ -137,7 +221,6 @@ async function onboardStudent(e) {
     submitBtn.textContent = "Saving...";
 
     try {
-        // 1. Insert student
         const { data: newStudent, error } = await supabaseClient.from('students').insert([{
             full_name: fullName,
             email,
@@ -148,7 +231,6 @@ async function onboardStudent(e) {
         
         if (error) throw error;
 
-        // 2. Insert enrollment records (if courses selected)
         if (selectedCourses.length > 0) {
             const enrollmentRows = selectedCourses.map(c => ({
                 student_id: newStudent.id,
@@ -211,7 +293,7 @@ async function loadOnboardingList() {
 
 async function populateOnboardingDropdowns() {
     const cSel = document.getElementById('onboard-center');
-    const courseCheckboxes = document.getElementById('onboard-courses'); // Fixed: was 'onboard-course'
+    const courseCheckboxes = document.getElementById('onboard-courses');
     
     if (!cSel || !courseCheckboxes) {
         console.log('Onboarding dropdowns not found, skipping populate');
@@ -224,7 +306,6 @@ async function populateOnboardingDropdowns() {
     cSel.innerHTML = '<option value="">— Select center —</option>' +
         (centers || []).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
-    // Generate checkboxes instead of dropdown options
     courseCheckboxes.innerHTML = (courses || []).filter(c => c.moodle_course_id).map(course => `
         <div class="check-pill">
             <input type="checkbox" class="course-check" value="${course.id}" 
@@ -233,3 +314,189 @@ async function populateOnboardingDropdowns() {
         </div>
     `).join('');
 }
+
+function toggleAllCourses() {
+    const checkboxes = document.querySelectorAll('.course-check');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+    });
+    
+    const btn = event.target;
+    btn.textContent = allChecked ? 'Select All' : 'Deselect All';
+}
+
+async function renderSessionOverview() {
+    const centerId = document.getElementById('center-select')?.value;
+    if (!centerId) {
+        document.getElementById('session-overview-body').innerHTML = 
+            '<tr><td colspan="6" class="empty">Select a center to view sessions.</td></tr>';
+        return;
+    }
+
+    const timeframeDays = parseInt(document.getElementById('overview-timeframe')?.value || '30');
+    const startDate = new Date(Date.now() - timeframeDays * 24 * 60 * 60 * 1000).toISOString();
+    const endDate = new Date().toISOString();
+
+    // Get sessions for this center
+    const { data: centerSessions } = await supabaseClient
+        .from('schedule_centers')
+        .select('schedule_id')
+        .eq('center_id', centerId);
+
+    if (!centerSessions || centerSessions.length === 0) {
+        document.getElementById('session-overview-body').innerHTML = 
+            '<tr><td colspan="6" class="empty">No sessions found for this center.</td></tr>';
+        return;
+    }
+
+    const scheduleIds = centerSessions.map(s => s.schedule_id);
+
+    const { data: sessions } = await supabaseClient
+        .from('schedule')
+        .select('id, lecture_topic, date_and_time, duration_min, courses(course_name)')
+        .in('id', scheduleIds)
+        .gte('date_and_time', startDate)
+        .lte('date_and_time', endDate)
+        .order('date_and_time', { ascending: false });
+
+    if (!sessions || sessions.length === 0) {
+        document.getElementById('session-overview-body').innerHTML = 
+            '<tr><td colspan="6" class="empty">No sessions in selected timeframe.</td></tr>';
+        return;
+    }
+
+    // Get attendance for these sessions
+    const { data: attendanceRecords } = await supabaseClient
+        .from('attendance')
+        .select('schedule_id, status, student_id')
+        .in('schedule_id', scheduleIds);
+
+    // Get total students in this center
+    const { data: centerStudents } = await supabaseClient
+        .from('students')
+        .select('id')
+        .eq('center_id', centerId);
+
+    const totalStudents = centerStudents?.length || 0;
+
+    const tbody = document.getElementById('session-overview-body');
+    tbody.innerHTML = sessions.map(session => {
+        const sessionAttendance = attendanceRecords?.filter(a => a.schedule_id === session.id) || [];
+        const presentCount = sessionAttendance.filter(a => a.status === 'Present').length;
+        const totalMarked = sessionAttendance.length;
+        const attendanceRate = totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : 0;
+
+        const date = new Date(session.date_and_time);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        let rateBadge = '';
+        if (totalMarked === 0) {
+            rateBadge = '<span class="badge">No data</span>';
+        } else if (attendanceRate >= 80) {
+            rateBadge = `<span class="badge badge-active">${attendanceRate}%</span>`;
+        } else if (attendanceRate >= 60) {
+            rateBadge = `<span class="badge badge-warn">${attendanceRate}%</span>`;
+        } else {
+            rateBadge = `<span class="badge badge-error">${attendanceRate}%</span>`;
+        }
+
+        return `
+        <tr>
+            <td><strong>${session.lecture_topic}</strong></td>
+            <td class="muted">${session.courses?.course_name || '—'}</td>
+            <td>
+                <div>${dateStr}</div>
+                <div class="muted">${timeStr}</div>
+            </td>
+            <td class="muted">${session.duration_min} min</td>
+            <td>
+                <div><strong>${presentCount}</strong> / ${totalMarked} marked</div>
+                <div class="muted">${totalStudents} total students</div>
+            </td>
+            <td>
+                <button onclick="showSessionAttendanceDetails('${session.id}', '${session.lecture_topic.replace(/'/g, "\\'")}', '${dateStr} ${timeStr}')" 
+                        class="btn-link" style="text-decoration: none;">
+                    ${rateBadge}
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function showSessionAttendanceDetails(sessionId, sessionTitle, sessionDateTime) {
+    document.getElementById('attendance-modal').classList.add('active');
+    
+    document.getElementById('modal-session-title').textContent = sessionTitle;
+    document.getElementById('modal-session-info').innerHTML = `
+        <strong>Date & Time:</strong> ${sessionDateTime}
+    `;
+
+    const { data: attendanceRecords } = await supabaseClient
+        .from('attendance')
+        .select('student_id, status, students(full_name, email)')
+        .eq('schedule_id', sessionId);
+
+    if (!attendanceRecords || attendanceRecords.length === 0) {
+        document.getElementById('modal-student-list').innerHTML = 
+            '<tr><td colspan="3" class="empty">No attendance marked for this session yet.</td></tr>';
+        document.getElementById('modal-present-count').textContent = '0';
+        document.getElementById('modal-absent-count').textContent = '0';
+        document.getElementById('modal-excused-count').textContent = '0';
+        return;
+    }
+
+
+    const presentCount = attendanceRecords.filter(r => r.status === 'Present').length;
+    const absentCount = attendanceRecords.filter(r => r.status === 'Absent').length;
+    const excusedCount = attendanceRecords.filter(r => r.status === 'Excused').length;
+
+    document.getElementById('modal-present-count').textContent = presentCount;
+    document.getElementById('modal-absent-count').textContent = absentCount;
+    document.getElementById('modal-excused-count').textContent = excusedCount;
+
+
+    const sortOrder = { 'Present': 1, 'Excused': 2, 'Absent': 3 };
+    attendanceRecords.sort((a, b) => sortOrder[a.status] - sortOrder[b.status]);
+
+
+    const tbody = document.getElementById('modal-student-list');
+    tbody.innerHTML = attendanceRecords.map(record => {
+        let statusBadge = '';
+        if (record.status === 'Present') {
+            statusBadge = '<span class="badge badge-active">✓ Present</span>';
+        } else if (record.status === 'Absent') {
+            statusBadge = '<span class="badge badge-error">✗ Absent</span>';
+        } else {
+            statusBadge = '<span class="badge badge-warn">⚠ Excused</span>';
+        }
+
+        return `
+        <tr>
+            <td><strong>${record.students?.full_name || 'Unknown'}</strong></td>
+            <td class="muted">${record.students?.email || '—'}</td>
+            <td>${statusBadge}</td>
+        </tr>`;
+    }).join('');
+}
+
+function closeAttendanceModal() {
+    document.getElementById('attendance-modal').classList.remove('active');
+}
+
+
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('attendance-modal');
+    if (event.target === modal) {
+        closeAttendanceModal();
+    }
+});
+
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeAttendanceModal();
+    }
+});

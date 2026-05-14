@@ -1,5 +1,3 @@
-// Session Reports Module
-
 async function loadRecentSessions() {
     const { data: sessions, error } = await supabaseClient
         .from('schedule')
@@ -76,7 +74,7 @@ async function submitReport(e) {
             center_condition: condition || null,
             issues: issues || null,
             attendees_count: count ? parseInt(count, 10) : null,
-            submitted_by: null, // TODO: Add teacher authentication
+            submitted_by: null, 
         }]);
 
         if (error) throw error;
@@ -126,7 +124,7 @@ async function loadReportsList() {
     `).join('');
 }
 
-// Initialize when reports view is shown
+
 function initReports() {
     loadRecentSessions();
     loadReportCenters();
@@ -134,7 +132,7 @@ function initReports() {
 
     const reportForm = document.getElementById('report-form');
     if (reportForm) {
-        reportForm.removeEventListener('submit', submitReport); // Prevent duplicates
+        reportForm.removeEventListener('submit', submitReport);
         reportForm.addEventListener('submit', submitReport);
     }
 }
