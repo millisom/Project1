@@ -46,6 +46,7 @@
 
     <main class="content">
 
+        <!-- ATTENDANCE -->
         <section id="view-attendance" class="view active">
             <header class="view-header">
                 <div>
@@ -129,6 +130,7 @@
             </div>
         </section>
 
+        <!-- SCHEDULE -->
         <section id="view-schedule" class="view">
             <header class="view-header">
                 <div>
@@ -175,7 +177,7 @@
             </div>
         </section>
 
-
+        <!-- ONBOARDING -->
         <section id="view-onboarding" class="view">
             <header class="view-header">
                 <div>
@@ -221,7 +223,7 @@
             </div>
         </section>
 
-
+        <!-- PROGRESS -->
         <section id="view-progress" class="view">
             <header class="view-header">
                 <div>
@@ -245,7 +247,7 @@
                         </select>
                     </div>
                     <div class="field">
-                        <button onclick="syncMoodleProgress()" class="btn-secondary"> Sync from Moodle</button>
+                        <button onclick="syncMoodleProgress()" class="btn-secondary">🔄 Sync from Moodle</button>
                     </div>
                 </div>
             </div>
@@ -291,7 +293,7 @@
             </div>
         </section>
 
-
+        <!-- REPORTS -->
         <section id="view-reports" class="view">
             <header class="view-header">
                 <div>
@@ -361,6 +363,7 @@
             </div>
         </section>
 
+        <!-- REMINDERS -->
         <section id="view-whatsapp" class="view">
             <header class="view-header">
                 <div>
@@ -409,7 +412,15 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">Upcoming Sessions (Next 7 Days)</h2>
-                    <button onclick="loadUpcomingSessions()" class="btn-secondary"> Refresh</button>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <div class="field" style="margin: 0; min-width: 250px;">
+                            <label>Filter by Center</label>
+                            <select id="reminder-center-filter" onchange="loadUpcomingSessions()">
+                                <option value="">— All Centers —</option>
+                            </select>
+                        </div>
+                        <button onclick="loadUpcomingSessions()" class="btn-secondary"> Refresh</button>
+                    </div>
                 </div>
                 <table class="data-table">
                     <thead>
@@ -433,7 +444,7 @@
 
     <div id="toast-container"></div>
 
-
+    <!-- Attendance Details Modal -->
     <div id="attendance-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
