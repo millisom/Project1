@@ -39,8 +39,8 @@ async function handleCenterChange(select) {
         return;
     }
 
-    // Load sessions for this center
-    const startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Load sessions for this center (past 30 days to future 30 days)
+    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data: centerSessions } = await supabaseClient
@@ -71,7 +71,37 @@ async function handleCenterChange(select) {
         return;
     }
 
+    // Separate sessions into categories
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todaySessions = [];
+    const upcomingSessions = [];
+    const pastSessions = [];
+
     sessions.forEach(session => {
+        const sessionDate = new Date(session.date_and_time);
+        const sessionEndTime = new Date(sessionDate.getTime() + (session.duration_min || 0) * 60000);
+        const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+        
+        // Today's sessions (including those not finished yet)
+        if (sessionDay.getTime() === today.getTime()) {
+            todaySessions.push(session);
+        } 
+        // Future sessions
+        else if (sessionDate > now) {
+            upcomingSessions.push(session);
+        } 
+        // Past sessions
+        else {
+            pastSessions.push(session);
+        }
+    });
+
+    // Helper function to create option element
+    function createSessionOption(session) {
         const date = new Date(session.date_and_time);
         const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -81,8 +111,38 @@ async function handleCenterChange(select) {
         option.value = session.id;
         option.textContent = `${dateStr} ${timeStr} - ${session.lecture_topic} (${courseName})`;
         option.dataset.sessionData = JSON.stringify(session);
-        sessionSelect.appendChild(option);
-    });
+        
+        return option;
+    }
+
+    // Render sessions in organized groups
+    if (todaySessions.length > 0) {
+        const todayGroup = document.createElement('optgroup');
+        todayGroup.label = ' Today';
+        todaySessions.forEach(session => {
+            todayGroup.appendChild(createSessionOption(session));
+        });
+        sessionSelect.appendChild(todayGroup);
+    }
+
+    if (upcomingSessions.length > 0) {
+        const upcomingGroup = document.createElement('optgroup');
+        upcomingGroup.label = ' Upcoming';
+        upcomingSessions.forEach(session => {
+            upcomingGroup.appendChild(createSessionOption(session));
+        });
+        sessionSelect.appendChild(upcomingGroup);
+    }
+
+    if (pastSessions.length > 0) {
+        const pastGroup = document.createElement('optgroup');
+        pastGroup.label = ' Past Sessions';
+        // Reverse order - most recent past sessions first
+        pastSessions.reverse().forEach(session => {
+            pastGroup.appendChild(createSessionOption(session));
+        });
+        sessionSelect.appendChild(pastGroup);
+    }
 
     await fetchStudents(centerId);
     
